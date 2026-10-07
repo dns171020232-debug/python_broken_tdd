@@ -21,9 +21,41 @@ def validate_order(
     shipping_city: str = "",
 ) -> str | None:
     """Return a human readable reason why the order is invalid, or None if it is fine."""
-        if not lines:
+    if not lines:
         return "order must contain at least one line"
-    return None
+
+    seen: set[str] = set()
+    for index, item in enumerate(lines, start=1):
+        for key in REQUIRED_LINE_KEYS:
+            if key not in item:
+                return f"line {index}: missing key {key}"
+
+        sku = item["sku"]
+        if not sku:
+            return f"line {index}: sku must not be empty"
+        if sku in seen:
+            return f"line {index}: duplicate sku {sku}"
+        seen.add(sku)
+
+        try:
+            qty = int(item["qty"])
+        except ValueError:
+            return f"line {index}: qty is not a number"
+        if qty <= 0:
+            return f"line {index}: qty must be positive"
+
+        try:
+            price = int(item["unit_price_kopecks"])
+        except ValueError:
+            return f"line {index}: price is not a number"
+        if price < 0:
+            return f"line {index}: price must not be negative"
+
+    if promo_code and promo_code not in PROMO_CODES:
+        return f"unknown promo code {promo_code}"
+    if shipping_city and shipping_city not in SUPPORTED_CITIES:
+        return f"unsupported city {shipping_city}"
+    return None 
 
 
 def calculate_order_total(
