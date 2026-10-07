@@ -4,7 +4,7 @@ The rules live in `src/shop/specs/checkout.md` - read it first.
 Both functions below are stubs: their signature is final, the bodies are yours.
 Do not change the constants: the tests rely on them.
 """
-
+from shop.money import percent_of
 PROMO_CODES = {"WELCOME10": 10, "SUMMER15": 15, "VIP35": 35}
 SUPPORTED_CITIES = ("msk", "spb")
 MAX_DISCOUNT_PERCENT = 30
@@ -64,4 +64,32 @@ def calculate_order_total(
     shipping_city: str = "",
 ) -> int | None:
     """Return the order total in kopecks, or None if the order is invalid."""
-    ...
+    if validate_order(lines, promo_code, shipping_city) is not None:
+        return None
+
+    subtotal = 0
+    units = 0
+    for item in lines:
+        qty = int(item["qty"])
+        price = int(item["unit_price_kopecks"])
+        subtotal += qty * price
+        units += qty
+
+    tier_percent = 0
+    for threshold, percent in TIER_DISCOUNTS:
+        if units >= threshold:
+            tier_percent = percent
+
+    promo_percent = PROMO_CODES.get(promo_code, 0)
+    discount_percent = min(max(tier_percent, promo_percent), MAX_DISCOUNT_PERCENT)
+
+    discount = percent_of(subtotal, discount_percent)
+    discounted_subtotal = subtotal - discount
+
+    shipping = 0
+    if shipping_city and discounted_subtotal < FREE_DELIVERY_FROM_KOPEKS:
+        shipping = SHIPPING_KOPEKS
+
+    base = discounted_subtotal + shipping
+    vat = percent_of(base, VAT_PERCENT)
+    return base + vat
